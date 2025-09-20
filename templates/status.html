@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Job Status - Video80s{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-tasks me-2"></i>Job Status</h2>
+    <div>
+        <button class="btn btn-outline-primary me-2" onclick="refreshJobs()">
+            <i class="fas fa-sync-alt me-1"></i>
+            Refresh
+        </button>
+        <a href="/" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>
+            Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-end">
+            <div class="col-md-3">
+                <label for="filter-status" class="form-label">Filter by Status</label>
+                <select class="form-select" id="filter-status">
+                    <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="filter-type" class="form-label">Filter by Type</label>
+                <select class="form-select" id="filter-type">
+                    <option value="all">All Types</option>
+                    <option value="process">Video Processing</option>
+                    <option value="upload">Direct Upload</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="search-file" class="form-label">Search Filename</label>
+                <input type="text" class="form-control" id="search-file" placeholder="Search filename...">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-danger" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i>
+                    Clear Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Jobs Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>
+            All Jobs
+        </h5>
+        <span class="badge bg-primary" id="total-jobs">0 jobs</span>
+    </div>
+    <div class="card-body">
+        <div id="jobs-container">
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading jobs...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allJobs = {};
+let filteredJobs = {};
+
+$(document).ready(function() {
+    loadJobs();
+    
+    // Auto refresh every 10 seconds
+    setInterval(loadJobs, 10000);
+    
+    // Filter event handlers
+    $('#filter-status, #filter-type').on('change', applyFilters);
+    $('#search-file').on('input', debounce(applyFilters, 300));
+});
+
+function loadJobs() {
+    $.get('/api/jobs')
+        .done(function(jobs) {
+            allJobs = jobs;
+            applyFilters();
+        })
+        .fail(function() {
+            $('#jobs-container').html('<div class="alert alert-warning">Unable to load jobs</div>');
+        });
+}
+
+function applyFilters() {
+    const statusFilter = $('#filter-status').val();
+    const typeFilter = $('#filter-type').val();
+    const searchFilter = $('#search-file').val().toLowerCase();
+    
+    filteredJobs = {};
+    
+    Object.keys(allJobs).forEach(function(jobKey) {
+        const job = allJobs[jobKey];
+        
+        // Status filter
+        if (statusFilter !== 'all' && job.status !== statusFilter) {
+            return;
+        }
+        
+        // Type filter
+        if (typeFilter !== 'all') {
+            const jobType = jobKey.startsWith('process_') ? 'process' : 'upload';
+            if (jobType !== typeFilter) {
+                return;
+            }
+        }
+        
+        // Search filter
+        if (searchFilter) {
+            const filename = (job.input_file || job.filename || '').toLowerCase();
+            if (!filename.includes(searchFilter)) {
+                return;
+            }
+        }
+        
+        filteredJobs[jobKey] = job;
+    });
+    
+    displayJobs();
+}
+
+function displayJobs() {
+    const jobCount = Object.keys(filteredJobs).length;
+    $('#total-jobs').text(jobCount + ' job' + (jobCount !== 1 ? 's' : ''));
+    
+    if (jobCount === 0) {
+        $('#jobs-container').html('<div class="text-center text-muted py-4">No jobs found</div>');
+        return;
+    }
+    
+    let html = '<div class="table-responsive">';
+    html += '<table class="table table-hover">';
+    html += '<thead class="table-light">';
+    html += '<tr>';
+    html += '<th>Type</th>';
+    html += '<th>File</th>';
+    html += '<th>Status</th>';
+    html += '<th>Progress</th>';
+    html += '<th>Message</th>';
+    html += '<th>Created</th>';
+    html += '<th>Actions</th>';
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
+    
+    // Sort jobs by creation time (newest first)
+    const sortedJobs = Object.entries(filteredJobs).sort((a, b) => {
+        return new Date(b[1].created_at) - new Date(a[1].created_at);
+    });
+    
+    sortedJobs.forEach(function([jobKey, job]) {
+        const jobType = jobKey.startsWith('process_') ? 'Process' : 'Upload';
+        const typeClass = jobKey.startsWith('process_') ? 'bg-primary' : 'bg-success';
+        const fileName = job.input_file || job.filename || 'Unknown';
+        const statusClass = getStatusClass(job.status);
+        const progress = job.progress || 0;
+        const createdAt = new Date(job.created_at).toLocaleString();
+        
+        html += '<tr>';
+        html += '<td><span class="badge ' + typeClass + '">' + jobType + '</span></td>';
+        html += '<td>';
+        html += '<div class="text-truncate" style="max-width: 200px;" title="' + fileName + '">';
+        html += fileName;
+        html += '</div>';
+        html += '</td>';
+        html += '<td><span class="badge ' + statusClass + ' status-badge">' + job.status + '</span></td>';
+        html += '<td>';
+        html += '<div class="progress" style="height: 6px; width: 80px;">';
+        html += '<div class="progress-bar" style="width: ' + progress + '%"></div>';
+        html += '</div>';
+        html += '<small class="text-muted">' + progress + '%</small>';
+        html += '</td>';
+        html += '<td>';
+        html += '<div class="text-truncate" style="max-width: 300px;" title="' + (job.message || '') + '">';
+        html += job.message || 'No message';
+        html += '</div>';
+        html += '</td>';
+        html += '<td><small class="text-muted">' + createdAt + '</small></td>';
+        html += '<td>';
+        
+        // Action buttons
+        if (job.download_url) {
+            html += '<a href="' + job.download_url + '" class="btn btn-sm btn-outline-primary me-1" title="Download">';
+            html += '<i class="fas fa-download"></i></a>';
+        }
+        
+        if (job.result && job.result.video_url) {
+            html += '<a href="' + job.result.video_url + '" target="_blank" class="btn btn-sm btn-outline-danger me-1" title="View on YouTube">';
+            html += '<i class="fab fa-youtube"></i></a>';
+        }
+        
+        if (job.result && job.result.shorts_url) {
+            html += '<a href="' + job.result.shorts_url + '" target="_blank" class="btn btn-sm btn-outline-success me-1" title="YouTube Shorts">';
+            html += '<i class="fas fa-mobile-alt"></i></a>';
+        }
+        
+        html += '<button class="btn btn-sm btn-outline-info" onclick="showJobDetails(\'' + jobKey + '\')" title="Details">';
+        html += '<i class="fas fa-info-circle"></i></button>';
+        
+        html += '</td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody>';
+    html += '</table>';
+    html += '</div>';
+    
+    $('#jobs-container').html(html);
+}
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'completed': return 'bg-success';
+        case 'processing': return 'bg-primary';
+        case 'pending': return 'bg-warning text-dark';
+        case 'failed': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
+}
+
+function showJobDetails(jobKey) {
+    const job = allJobs[jobKey];
+    if (!job) return;
+    
+    let html = '<div class="modal fade" id="jobModal" tabindex="-1">';
+    html += '<div class="modal-dialog modal-lg">';
+    html += '<div class="modal-content">';
+    html += '<div class="modal-header">';
+    html += '<h5 class="modal-title">Job Details</h5>';
+    html += '<button type="button" class="btn-close" data-bs-dismiss="modal"></button>';
+    html += '</div>';
+    html += '<div class="modal-body">';
+    
+    html += '<div class="row">';
+    html += '<div class="col-md-6">';
+    html += '<strong>Job ID:</strong><br><code>' + job.id + '</code><br><br>';
+    html += '<strong>Type:</strong><br>' + (jobKey.startsWith('process_') ? 'Video Processing' : 'Direct Upload') + '<br><br>';
+    html += '<strong>Status:</strong><br><span class="badge ' + getStatusClass(job.status) + '">' + job.status + '</span><br><br>';
+    html += '<strong>Progress:</strong><br>' + (job.progress || 0) + '%<br><br>';
+    html += '</div>';
+    html += '<div class="col-md-6">';
+    html += '<strong>File:</strong><br>' + (job.input_file || job.filename || 'N/A') + '<br><br>';
+    html += '<strong>Created:</strong><br>' + new Date(job.created_at).toLocaleString() + '<br><br>';
+    html += '<strong>Message:</strong><br>' + (job.message || 'No message') + '<br><br>';
+    html += '</div>';
+    html += '</div>';
+    
+    if (job.result) {
+        html += '<hr>';
+        html += '<h6>Result Details:</h6>';
+        html += '<pre class="bg-light p-3 rounded"><code>' + JSON.stringify(job.result, null, 2) + '</code></pre>';
+    }
+    
+    html += '</div>';
+    html += '<div class="modal-footer">';
+    html += '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+    html += '</div>';
+    
+    // Remove existing modal if any
+    $('#jobModal').remove();
+    
+    // Add and show modal
+    $('body').append(html);
+    $('#jobModal').modal('show');
+}
+
+function refreshJobs() {
+    loadJobs();
+}
+
+function clearFilters() {
+    $('#filter-status').val('all');
+    $('#filter-type').val('all');
+    $('#search-file').val('');
+    applyFilters();
+}
+
+// Debounce function for search
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+</script>
+{% endblock %}

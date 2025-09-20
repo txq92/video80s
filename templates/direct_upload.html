@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block title %}Direct Upload - Video80s{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fab fa-youtube me-2"></i>Direct YouTube Upload</h2>
+    <a href="/" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>
+        Back to Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cloud-upload-alt me-2"></i>
+                    Upload Video Directly to YouTube
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="direct-upload-form" enctype="multipart/form-data">
+                    <!-- File Upload Area -->
+                    <div class="file-upload-area mb-4" onclick="document.getElementById('video-file').click()">
+                        <i class="fab fa-youtube fa-3x text-danger mb-3"></i>
+                        <h5>Choose Video File</h5>
+                        <p class="text-muted">Upload directly to YouTube without processing</p>
+                        <small class="text-muted">Supported formats: MP4, AVI, MOV, MKV, WMV, WEBM (Max: 1GB)</small>
+                        <input type="file" id="video-file" name="video" accept="video/*" style="display: none;" required>
+                        <div id="file-info" class="mt-3" style="display: none;"></div>
+                    </div>
+                    
+                    <!-- Video Metadata -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="video-title" class="form-label">Video Title *</label>
+                                <input type="text" class="form-control" id="video-title" name="title" placeholder="Enter video title" maxlength="100" required>
+                                <small class="text-muted">Maximum 100 characters</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="privacy" class="form-label">Privacy Setting</label>
+                                <select class="form-select" id="privacy" name="privacy">
+                                    <option value="public">Public - Anyone can search and view</option>
+                                    <option value="unlisted">Unlisted - Only people with the link can view</option>
+                                    <option value="private">Private - Only you can view</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="4" placeholder="Enter video description..."></textarea>
+                        <small class="text-muted">Describe your video (optional)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tags" class="form-label">Tags</label>
+                        <input type="text" class="form-control" id="tags" name="tags" placeholder="tag1, tag2, tag3">
+                        <small class="text-muted">Separate tags with commas (e.g: gaming, funny, vietnam)</small>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-danger btn-lg" id="submit-btn">
+                            <i class="fab fa-youtube me-2"></i>
+                            Upload to YouTube
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Progress Section -->
+                <div id="progress-section" class="mt-4" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span id="progress-message">Uploading...</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar bg-danger" id="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Result Section -->
+                <div id="result-section" class="mt-4" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Info Panel -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Upload Information
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Upload directly to YouTube
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        No video processing/editing
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Preserve original quality
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Custom title & description
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Privacy control
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Automatic #Shorts tag for short videos
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Privacy Settings Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    Privacy Settings
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong class="text-success">Public</strong>
+                    <small class="d-block text-muted">Anyone can search for and view your video</small>
+                </div>
+                <div class="mb-3">
+                    <strong class="text-warning">Unlisted</strong>
+                    <small class="d-block text-muted">Only people with the link can view your video</small>
+                </div>
+                <div class="mb-3">
+                    <strong class="text-danger">Private</strong>
+                    <small class="d-block text-muted">Only you can view your video</small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- YouTube Shorts Tip -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>
+                    YouTube Shorts Tip
+                </h6>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-0">
+                    Videos under 60 seconds with vertical aspect ratio (9:16) will automatically be recognized as YouTube Shorts.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentJobId = null;
+let progressInterval = null;
+
+$(document).ready(function() {
+    // File input change handler
+    $('#video-file').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            displayFileInfo(file);
+            // Auto-generate title from filename
+            if (!$('#video-title').val()) {
+                const title = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                $('#video-title').val(title);
+            }
+        }
+    });
+    
+    // Drag and drop handlers
+    $('.file-upload-area').on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+    
+    $('.file-upload-area').on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+    
+    $('.file-upload-area').on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('video/')) {
+            $('#video-file')[0].files = files;
+            const file = files[0];
+            displayFileInfo(file);
+            // Auto-generate title from filename
+            if (!$('#video-title').val()) {
+                const title = file.name.replace(/\.[^/.]+$/, "");
+                $('#video-title').val(title);
+            }
+        }
+    });
+    
+    // Form submit handler
+    $('#direct-upload-form').on('submit', function(e) {
+        e.preventDefault();
+        uploadToYouTube();
+    });
+    
+    // Character counter for title
+    $('#video-title').on('input', function() {
+        const length = $(this).val().length;
+        $(this).next('small').text(`${length}/100 characters`);
+        
+        if (length > 100) {
+            $(this).addClass('is-invalid');
+        } else {
+            $(this).removeClass('is-invalid');
+        }
+    });
+});
+
+function displayFileInfo(file) {
+    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+    const duration = file.duration ? `${Math.round(file.duration)}s` : 'Unknown';
+    
+    let alertClass = 'alert-info';
+    let durationInfo = '';
+    
+    // Check if likely to be YouTube Shorts
+    if (file.size > 0) {
+        // Estimate if it's short video (this is rough estimation)
+        const estimatedDuration = file.size / (1024 * 1024); // Very rough MB to minutes
+        if (estimatedDuration < 1) {
+            durationInfo = '<br><small class="text-success"><i class="fas fa-mobile-alt me-1"></i>Likely YouTube Shorts format</small>';
+        }
+    }
+    
+    const html = `
+        <div class="alert ${alertClass}">
+            <strong>Selected File:</strong><br>
+            Name: ${file.name}<br>
+            Size: ${sizeInMB} MB<br>
+            Type: ${file.type}
+            ${durationInfo}
+        </div>
+    `;
+    $('#file-info').html(html).show();
+}
+
+function uploadToYouTube() {
+    const formData = new FormData($('#direct-upload-form')[0]);
+    
+    // Validate form
+    if (!$('#video-title').val().trim()) {
+        alert('Please enter a video title');
+        return;
+    }
+    
+    // Show progress section
+    $('#progress-section').show();
+    $('#result-section').hide();
+    $('#submit-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Uploading...');
+    
+    // Upload file
+    $.ajax({
+        url: '/api/direct-upload',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhr: function() {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    updateProgress('Uploading to server...', Math.round(percentComplete));
+                }
+            });
+            return xhr;
+        },
+        success: function(response) {
+            currentJobId = response.job_id;
+            updateProgress('File uploaded. Connecting to YouTube...', 100);
+            startProgressTracking();
+        },
+        error: function(xhr, status, error) {
+            showError('Upload failed: ' + (xhr.responseJSON?.error || error));
+            resetForm();
+        }
+    });
+}
+
+function startProgressTracking() {
+    if (!currentJobId) return;
+    
+    progressInterval = setInterval(function() {
+        $.get('/api/job/' + currentJobId)
+            .done(function(job) {
+                updateProgress(job.message, job.progress);
+                
+                if (job.status === 'completed') {
+                    clearInterval(progressInterval);
+                    showSuccess(job);
+                    resetForm();
+                } else if (job.status === 'failed') {
+                    clearInterval(progressInterval);
+                    showError(job.message);
+                    resetForm();
+                }
+            })
+            .fail(function() {
+                clearInterval(progressInterval);
+                showError('Unable to track upload progress');
+                resetForm();
+            });
+    }, 2000);
+}
+
+function updateProgress(message, percentage) {
+    $('#progress-message').text(message);
+    $('#progress-percentage').text(percentage + '%');
+    $('#progress-bar').css('width', percentage + '%');
+}
+
+function showSuccess(job) {
+    let html = '<div class="alert alert-success">';
+    html += '<h5><i class="fas fa-check-circle me-2"></i>Upload Successful!</h5>';
+    html += '<p>Your video has been uploaded to YouTube successfully.</p>';
+    
+    if (job.result && job.result.video_url) {
+        html += '<div class="mb-3">';
+        html += '<strong>Video Links:</strong><br>';
+        html += '<a href="' + job.result.video_url + '" target="_blank" class="btn btn-primary me-2 mb-2">';
+        html += '<i class="fab fa-youtube me-1"></i>Watch on YouTube</a>';
+        
+        if (job.result.shorts_url) {
+            html += '<a href="' + job.result.shorts_url + '" target="_blank" class="btn btn-success mb-2">';
+            html += '<i class="fas fa-mobile-alt me-1"></i>YouTube Shorts</a>';
+        }
+        html += '</div>';
+        
+        html += '<div class="mb-2"><strong>Video ID:</strong> <code>' + job.result.video_id + '</code></div>';
+        html += '<div class="mb-2"><strong>Title:</strong> ' + (job.result.title || 'N/A') + '</div>';
+        html += '<div class="mb-2"><strong>Privacy:</strong> <span class="badge bg-info">' + (job.result.privacy_status || 'N/A') + '</span></div>';
+    }
+    
+    html += '</div>';
+    $('#result-section').html(html).show();
+}
+
+function showError(message) {
+    const html = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>' + message + '</div>';
+    $('#result-section').html(html).show();
+}
+
+function resetForm() {
+    $('#submit-btn').prop('disabled', false).html('<i class="fab fa-youtube me-2"></i>Upload to YouTube');
+    $('#progress-section').hide();
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+}
+</script>
+{% endblock %}

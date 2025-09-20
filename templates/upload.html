@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Process Video - Video80s{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-cog me-2"></i>Process Video</h2>
+    <a href="/" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i>
+        Back to Dashboard
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Upload Form -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-upload me-2"></i>
+                    Upload Video for Processing
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <!-- File Upload Area -->
+                    <div class="file-upload-area mb-4" onclick="document.getElementById('video-file').click()">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>Choose Video File</h5>
+                        <p class="text-muted">Drag and drop or click to select</p>
+                        <small class="text-muted">Supported formats: MP4, AVI, MOV, MKV, WMV, WEBM (Max: 1GB)</small>
+                        <input type="file" id="video-file" name="video" accept="video/*" style="display: none;" required>
+                        <div id="file-info" class="mt-3" style="display: none;"></div>
+                    </div>
+                    
+                    <!-- Processing Options -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="background-style" class="form-label">Background Style</label>
+                                <select class="form-select" id="background-style" name="background_style">
+                                    <option value="blur">Blur Background</option>
+                                    <option value="gradient">Gradient Background</option>
+                                    <option value="solid">Solid Color Background</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check form-switch mt-4">
+                                    <input class="form-check-input" type="checkbox" id="auto-upload" name="auto_upload">
+                                    <label class="form-check-label" for="auto-upload">
+                                        Auto upload to YouTube after processing
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
+                            <i class="fas fa-cog me-2"></i>
+                            Start Processing
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Progress Section -->
+                <div id="progress-section" class="mt-4" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span id="progress-message">Processing...</span>
+                            <span id="progress-percentage">0%</span>
+                        </div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Result Section -->
+                <div id="result-section" class="mt-4" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Info Panel -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Processing Features
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Resize to 9:16 aspect ratio (YouTube Shorts)
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Add logo overlay
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Insert intro banner (20 seconds)
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Insert outro banner (5 seconds)
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Customizable background style
+                    </li>
+                    <li class="mb-2">
+                        <i class="fas fa-check text-success me-2"></i>
+                        Auto-trim videos longer than 180s
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Background Style Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-palette me-2"></i>
+                    Background Styles
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Blur</strong>
+                    <small class="d-block text-muted">Blurred version of the original video as background</small>
+                </div>
+                <div class="mb-3">
+                    <strong>Gradient</strong>
+                    <small class="d-block text-muted">Blue gradient background</small>
+                </div>
+                <div class="mb-3">
+                    <strong>Solid</strong>
+                    <small class="d-block text-muted">Solid sky blue background</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentJobId = null;
+let progressInterval = null;
+
+$(document).ready(function() {
+    // File input change handler
+    $('#video-file').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            displayFileInfo(file);
+        }
+    });
+    
+    // Drag and drop handlers
+    $('.file-upload-area').on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+    
+    $('.file-upload-area').on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+    
+    $('.file-upload-area').on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0 && files[0].type.startsWith('video/')) {
+            $('#video-file')[0].files = files;
+            displayFileInfo(files[0]);
+        }
+    });
+    
+    // Form submit handler
+    $('#upload-form').on('submit', function(e) {
+        e.preventDefault();
+        uploadAndProcess();
+    });
+});
+
+function displayFileInfo(file) {
+    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+    const html = `
+        <div class="alert alert-info">
+            <strong>Selected File:</strong><br>
+            Name: ${file.name}<br>
+            Size: ${sizeInMB} MB<br>
+            Type: ${file.type}
+        </div>
+    `;
+    $('#file-info').html(html).show();
+}
+
+function uploadAndProcess() {
+    const formData = new FormData($('#upload-form')[0]);
+    
+    // Show progress section
+    $('#progress-section').show();
+    $('#result-section').hide();
+    $('#submit-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Uploading...');
+    
+    // Upload file
+    $.ajax({
+        url: '/api/process-video',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        xhr: function() {
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener('progress', function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    updateProgress('Uploading...', Math.round(percentComplete));
+                }
+            });
+            return xhr;
+        },
+        success: function(response) {
+            currentJobId = response.job_id;
+            updateProgress('Upload completed. Starting processing...', 100);
+            startProgressTracking();
+        },
+        error: function(xhr, status, error) {
+            showError('Upload failed: ' + (xhr.responseJSON?.error || error));
+            resetForm();
+        }
+    });
+}
+
+function startProgressTracking() {
+    if (!currentJobId) return;
+    
+    progressInterval = setInterval(function() {
+        $.get('/api/job/' + currentJobId)
+            .done(function(job) {
+                updateProgress(job.message, job.progress);
+                
+                if (job.status === 'completed') {
+                    clearInterval(progressInterval);
+                    showSuccess(job);
+                    resetForm();
+                } else if (job.status === 'failed') {
+                    clearInterval(progressInterval);
+                    showError(job.message);
+                    resetForm();
+                }
+            })
+            .fail(function() {
+                clearInterval(progressInterval);
+                showError('Unable to track job progress');
+                resetForm();
+            });
+    }, 2000);
+}
+
+function updateProgress(message, percentage) {
+    $('#progress-message').text(message);
+    $('#progress-percentage').text(percentage + '%');
+    $('#progress-bar').css('width', percentage + '%');
+}
+
+function showSuccess(job) {
+    let html = '<div class="alert alert-success">';
+    html += '<h5><i class="fas fa-check-circle me-2"></i>Processing Completed!</h5>';
+    html += '<p>Your video has been processed successfully.</p>';
+    
+    if (job.download_url) {
+        html += '<a href="' + job.download_url + '" class="btn btn-success me-2">';
+        html += '<i class="fas fa-download me-1"></i>Download Processed Video</a>';
+    }
+    
+    if (job.result && job.result.youtube_info) {
+        html += '<a href="' + job.result.youtube_info.shorts_url + '" target="_blank" class="btn btn-primary">';
+        html += '<i class="fab fa-youtube me-1"></i>View on YouTube</a>';
+    }
+    
+    html += '</div>';
+    $('#result-section').html(html).show();
+}
+
+function showError(message) {
+    const html = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>' + message + '</div>';
+    $('#result-section').html(html).show();
+}
+
+function resetForm() {
+    $('#submit-btn').prop('disabled', false).html('<i class="fas fa-cog me-2"></i>Start Processing');
+    $('#progress-section').hide();
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+}
+</script>
+{% endblock %}

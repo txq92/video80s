@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  video80s-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video80s-api
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount directories for persistent data
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./assets:/app/assets
+      # Mount credentials (keep these secure)
+      - ./client_secrets.json:/app/client_secrets.json:ro
+      - ./token.pickle:/app/token.pickle
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+      # Optional: Override config via environment variables
+      - DEFAULT_LOGO_PATH=/app/assets/logo.png
+      - DEFAULT_BANNER_PATH=/app/assets/banner.png
+      - DEFAULT_INTRO_PATH=/app/assets/intro.jpg
+      - DEFAULT_OUTTRO_PATH=/app/assets/outtro.png
+      - INPUT_FOLDER=/app/input
+      - OUTPUT_FOLDER=/app/output
+      - BACKGROUND_STYLE=blur
+      - DATABASE_FILE=/app/data/videos_database.json
+      - CSV_EXPORT_PATH=/app/data/videos_export.csv
+      - BACKUP_ENABLED=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # Optional: Add nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: video80s-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment for SSL certificates
+      # - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - video80s-api
+    restart: unless-stopped
+    profiles:
+      - production
+
+# Optional: Add monitoring with Grafana + Prometheus
+  prometheus:
+    image: prom/prometheus
+    container_name: video80s-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana
+    container_name: video80s-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+
+volumes:
+  grafana_data:
+
+networks:
+  default:
+    name: video80s-network

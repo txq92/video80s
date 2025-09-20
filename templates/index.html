@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Video80s{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h2>
+    <button class="btn btn-outline-primary" onclick="refreshStats()">
+        <i class="fas fa-sync-alt me-1"></i>
+        Refresh
+    </button>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-primary mb-2">
+                    <i class="fas fa-video fa-2x"></i>
+                </div>
+                <h4 id="total-processed">0</h4>
+                <small class="text-muted">Videos Processed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-success mb-2">
+                    <i class="fab fa-youtube fa-2x"></i>
+                </div>
+                <h4 id="total-uploaded">0</h4>
+                <small class="text-muted">YouTube Uploads</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-info mb-2">
+                    <i class="fas fa-clock fa-2x"></i>
+                </div>
+                <h4 id="jobs-running">0</h4>
+                <small class="text-muted">Jobs Running</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <div class="text-warning mb-2">
+                    <i class="fas fa-download fa-2x"></i>
+                </div>
+                <h4 id="files-ready">0</h4>
+                <small class="text-muted">Files Ready</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fas fa-cog me-2"></i>
+                    Process Video
+                </h5>
+                <p class="card-text">Upload và xử lý video với logo, banner và resize 9:16</p>
+                <a href="/upload" class="btn btn-primary">
+                    <i class="fas fa-upload me-1"></i>
+                    Start Processing
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="fab fa-youtube me-2"></i>
+                    Direct Upload
+                </h5>
+                <p class="card-text">Upload video trực tiếp lên YouTube mà không cần edit</p>
+                <a href="/direct-upload" class="btn btn-success">
+                    <i class="fas fa-cloud-upload-alt me-1"></i>
+                    Upload to YouTube
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Jobs -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-history me-2"></i>
+            Recent Jobs
+        </h5>
+        <a href="/status" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="card-body">
+        <div id="recent-jobs" class="table-responsive">
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading recent jobs...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Status -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-server me-2"></i>
+                    System Status
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="system-status">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>API Health</span>
+                        <span class="badge bg-success status-badge" id="api-status">Checking...</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>YouTube Auth</span>
+                        <span class="badge bg-secondary status-badge" id="youtube-status">Unknown</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>Storage</span>
+                        <span class="badge bg-success status-badge" id="storage-status">OK</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-folder me-2"></i>
+                    Available Files
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="available-files">
+                    <div class="text-center py-2">
+                        <small class="text-muted">Loading files...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    loadDashboardData();
+    
+    // Auto refresh every 30 seconds
+    setInterval(loadDashboardData, 30000);
+});
+
+function loadDashboardData() {
+    // Check API health
+    $.get('/api/health')
+        .done(function() {
+            $('#api-status').removeClass('bg-danger').addClass('bg-success').text('Healthy');
+        })
+        .fail(function() {
+            $('#api-status').removeClass('bg-success').addClass('bg-danger').text('Error');
+        });
+    
+    // Load jobs
+    $.get('/api/jobs')
+        .done(function(jobs) {
+            updateStats(jobs);
+            displayRecentJobs(jobs);
+        })
+        .fail(function() {
+            $('#recent-jobs').html('<div class="alert alert-warning">Unable to load jobs</div>');
+        });
+    
+    // Load files
+    $.get('/api/files')
+        .done(function(files) {
+            $('#files-ready').text(files.length);
+            displayAvailableFiles(files);
+        })
+        .fail(function() {
+            $('#available-files').html('<small class="text-danger">Unable to load files</small>');
+        });
+}
+
+function updateStats(jobs) {
+    let processedCount = 0;
+    let uploadedCount = 0;
+    let runningCount = 0;
+    
+    Object.values(jobs).forEach(function(job) {
+        if (job.status === 'completed') {
+            if (job.id.startsWith('process_')) processedCount++;
+            if (job.id.startsWith('upload_')) uploadedCount++;
+        }
+        if (job.status === 'processing' || job.status === 'pending') {
+            runningCount++;
+        }
+    });
+    
+    $('#total-processed').text(processedCount);
+    $('#total-uploaded').text(uploadedCount);
+    $('#jobs-running').text(runningCount);
+}
+
+function displayRecentJobs(jobs) {
+    const recentJobs = Object.values(jobs).slice(0, 5);
+    
+    if (recentJobs.length === 0) {
+        $('#recent-jobs').html('<div class="text-center text-muted py-3">No recent jobs</div>');
+        return;
+    }
+    
+    let html = '<table class="table table-sm">';
+    html += '<thead><tr><th>Type</th><th>File</th><th>Status</th><th>Progress</th><th>Actions</th></tr></thead><tbody>';
+    
+    recentJobs.forEach(function(job) {
+        const jobType = job.id ? (job.id.startsWith('process_') ? 'Process' : 'Upload') : 'Unknown';
+        const fileName = job.input_file || job.filename || 'Unknown';
+        const statusClass = getStatusClass(job.status);
+        const progress = job.progress || 0;
+        
+        html += '<tr>';
+        html += '<td><span class="badge bg-primary">' + jobType + '</span></td>';
+        html += '<td>' + fileName.substring(0, 30) + (fileName.length > 30 ? '...' : '') + '</td>';
+        html += '<td><span class="badge ' + statusClass + ' status-badge">' + job.status + '</span></td>';
+        html += '<td>';
+        html += '<div class="progress" style="height: 8px;">';
+        html += '<div class="progress-bar" style="width: ' + progress + '%"></div>';
+        html += '</div>';
+        html += '</td>';
+        html += '<td>';
+        if (job.download_url) {
+            html += '<a href="' + job.download_url + '" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>';
+        }
+        html += '</td>';
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    $('#recent-jobs').html(html);
+}
+
+function displayAvailableFiles(files) {
+    if (files.length === 0) {
+        $('#available-files').html('<small class="text-muted">No files available</small>');
+        return;
+    }
+    
+    let html = '';
+    files.slice(0, 5).forEach(function(file) {
+        const sizeKB = Math.round(file.size / 1024);
+        html += '<div class="d-flex justify-content-between align-items-center mb-1">';
+        html += '<small>' + file.filename.substring(0, 25) + (file.filename.length > 25 ? '...' : '') + '</small>';
+        html += '<div>';
+        html += '<small class="text-muted me-2">' + sizeKB + 'KB</small>';
+        html += '<a href="' + file.download_url + '" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>';
+        html += '</div>';
+        html += '</div>';
+    });
+    
+    if (files.length > 5) {
+        html += '<small class="text-muted">And ' + (files.length - 5) + ' more files...</small>';
+    }
+    
+    $('#available-files').html(html);
+}
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'completed': return 'bg-success';
+        case 'processing': return 'bg-primary';
+        case 'pending': return 'bg-warning';
+        case 'failed': return 'bg-danger';
+        default: return 'bg-secondary';
+    }
+}
+
+function refreshStats() {
+    loadDashboardData();
+}
+</script>
+{% endblock %}
