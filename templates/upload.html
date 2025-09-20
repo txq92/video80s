@@ -33,6 +33,27 @@
                         <div id="file-info" class="mt-3" style="display: none;"></div>
                     </div>
                     
+                    <!-- Banner/Overlay Images -->
+                    <div class="mb-4">
+                        <h6><i class="fas fa-images me-2"></i>Custom Banner Images (Optional)</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="intro-image" class="form-label">Intro Banner (20s)</label>
+                                    <input type="file" class="form-control" id="intro-image" name="intro_image" accept="image/*">
+                                    <small class="text-muted">PNG/JPG - Will be displayed for the first 20 seconds</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="outro-image" class="form-label">Outro Banner (5s)</label>
+                                    <input type="file" class="form-control" id="outro-image" name="outro_image" accept="image/*">
+                                    <small class="text-muted">PNG/JPG - Will be displayed for the last 5 seconds</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Processing Options -->
                     <div class="row">
                         <div class="col-md-6">
@@ -106,11 +127,13 @@
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-check text-success me-2"></i>
-                        Insert intro banner (20 seconds)
+                        Insert custom intro banner (20 seconds)
+                        <small class="d-block text-muted">Uses uploaded image or default</small>
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-check text-success me-2"></i>
-                        Insert outro banner (5 seconds)
+                        Insert custom outro banner (5 seconds)
+                        <small class="d-block text-muted">Uses uploaded image or default</small>
                     </li>
                     <li class="mb-2">
                         <i class="fas fa-check text-success me-2"></i>
@@ -287,8 +310,25 @@ function showSuccess(job) {
     }
     
     if (job.result && job.result.youtube_info) {
-        html += '<a href="' + job.result.youtube_info.shorts_url + '" target="_blank" class="btn btn-primary">';
-        html += '<i class="fab fa-youtube me-1"></i>View on YouTube</a>';
+        html += '<div class="mt-3">';
+        html += '<h6><i class="fab fa-youtube me-2 text-danger"></i>YouTube Upload Successful!</h6>';
+        html += '<div class="btn-group me-2" role="group">';
+        html += '<a href="' + job.result.youtube_info.video_url + '" target="_blank" class="btn btn-outline-primary btn-sm">';
+        html += '<i class="fas fa-external-link-alt me-1"></i>Regular View</a>';
+        html += '<a href="' + job.result.youtube_info.shorts_url + '" target="_blank" class="btn btn-primary btn-sm">';
+        html += '<i class="fab fa-youtube me-1"></i>Shorts View</a>';
+        html += '</div>';
+        if (job.result.youtube_info.video_id) {
+            html += '<small class="d-block text-muted mt-2">Video ID: ' + job.result.youtube_info.video_id + '</small>';
+        }
+        html += '</div>';
+    } else if (job.auto_upload) {
+        html += '<div class="mt-3">';
+        html += '<div class="alert alert-warning">';
+        html += '<i class="fas fa-exclamation-triangle me-2"></i>';
+        html += 'Auto-upload was enabled but may have failed. Check the processing logs or try manual upload.';
+        html += '</div>';
+        html += '</div>';
     }
     
     html += '</div>';

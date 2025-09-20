@@ -76,16 +76,27 @@ class VideoProcessor:
             # 2) Resize về 9:16 với nền theo style
             video_resized = self._resize_video_to_portrait(video_with_logo)
 
-            # 3) Banner 20 giây đầu
-            video_with_intro = self._add_banner_intro(video_resized, duration=20)
+            # 3) Banner 20 giây đầu (nếu có file)
+            if self.banner_intro_path and os.path.exists(self.banner_intro_path):
+                video_with_intro = self._add_banner_intro(video_resized, duration=20)
+                print(f"Đã thêm intro banner: {self.banner_intro_path}")
+            else:
+                video_with_intro = video_resized
+                print("Không có intro banner - bỏ qua")
 
-            # 4) Banner 5 giây cuối
-            final_video = self._add_banner_outro(video_with_intro, duration=5)
+            # 4) Banner 5 giây cuối (nếu có file)
+            if self.banner_outro_path and os.path.exists(self.banner_outro_path):
+                final_video = self._add_banner_outro(video_with_intro, duration=5)
+                print(f"Đã thêm outro banner: {self.banner_outro_path}")
+            else:
+                final_video = video_with_intro
+                print("Không có outro banner - bỏ qua")
 
             # 5) Xuất file
             print(f"Đang xuất video đến: {self.output_path}")
             final_video.write_videofile(
                 self.output_path,
+                fps=video.fps or 24,
                 codec="libx264",
                 audio_codec="aac",
                 temp_audiofile="temp-audio.m4a",

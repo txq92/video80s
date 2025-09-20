@@ -115,7 +115,28 @@ def process_video_api():
         
         # Get processing options
         background_style = request.form.get('background_style', 'blur')
-        auto_upload = request.form.get('auto_upload', 'false').lower() == 'true'
+        # Handle checkbox: can be 'on' (checked) or 'true', or missing (unchecked)
+        auto_upload_value = request.form.get('auto_upload', 'false').lower()
+        auto_upload = auto_upload_value in ['true', 'on', '1']
+        print(f"📝 DEBUG: Form auto_upload = '{request.form.get('auto_upload')}' -> {auto_upload}")
+        
+        # Handle custom intro/outro images
+        custom_intro_path = None
+        custom_outro_path = None
+        
+        if 'intro_image' in request.files and request.files['intro_image'].filename != '':
+            intro_file = request.files['intro_image']
+            if allowed_file(intro_file.filename, ['png', 'jpg', 'jpeg']):
+                intro_filename = f"{job_id}_intro_{secure_filename(intro_file.filename)}"
+                custom_intro_path = os.path.join(VIDEO_CONFIG['temp_folder'], intro_filename)
+                intro_file.save(custom_intro_path)
+                
+        if 'outro_image' in request.files and request.files['outro_image'].filename != '':
+            outro_file = request.files['outro_image']
+            if allowed_file(outro_file.filename, ['png', 'jpg', 'jpeg']):
+                outro_filename = f"{job_id}_outro_{secure_filename(outro_file.filename)}"
+                custom_outro_path = os.path.join(VIDEO_CONFIG['temp_folder'], outro_filename)
+                outro_file.save(custom_outro_path)
         
         # Create output filename
         output_filename = f"processed_{unique_filename.rsplit('.', 1)[0]}.mp4"
@@ -131,12 +152,14 @@ def process_video_api():
             'message': 'Job queued',
             'created_at': datetime.now().isoformat(),
             'auto_upload': auto_upload,
-            'background_style': background_style
+            'background_style': background_style,
+            'custom_intro_path': custom_intro_path,
+            'custom_outro_path': custom_outro_path
         }
         
         # Start processing in background
         import threading
-        thread = threading.Thread(target=process_video_background, args=(job_id, input_path, output_path, background_style, auto_upload))
+        thread = threading.Thread(target=process_video_background, args=(job_id, input_path, output_path, background_style, auto_upload, custom_intro_path, custom_outro_path))
         thread.daemon = True
         thread.start()
         
@@ -152,7 +175,7 @@ def process_video_api():
         return jsonify({'error': str(e)}), 500
 
 
-def process_video_background(job_id, input_path, output_path, background_style, auto_upload):
+def process_video_background(job_id, input_path, output_path, background_style, auto_upload, custom_intro_path=None, custom_outro_path=None):
     """Background video processing"""
     try:
         # Update job status
@@ -160,15 +183,19 @@ def process_video_background(job_id, input_path, output_path, background_style, 
         processing_jobs[job_id]['message'] = 'Processing video...'
         processing_jobs[job_id]['progress'] = 10
         
+        # Determine intro/outro paths (custom uploaded or default)
+        intro_path = custom_intro_path or VIDEO_CONFIG['banner_intro_path']
+        outro_path = custom_outro_path or VIDEO_CONFIG['banner_outro_path']
+        
         # Create video processor
         processor = VideoProcessor(
             input_video=input_path,
             logo_path=VIDEO_CONFIG['logo_path'],
-            banner_path=VIDEO_CONFIG['banner_path'],
+            banner_path=VIDEO_CONFIG['banner_path'],  # Keep for backward compatibility
             output_path=output_path,
             background_style=background_style,
-            banner_intro_path=VIDEO_CONFIG['banner_intro_path'],
-            banner_outro_path=VIDEO_CONFIG['banner_outro_path']
+            banner_intro_path=intro_path,
+            banner_outro_path=outro_path
         )
         
         processing_jobs[job_id]['progress'] = 30
@@ -185,8 +212,22 @@ def process_video_background(job_id, input_path, output_path, background_style, 
             processing_jobs[job_id]['download_url'] = f'/api/download/{os.path.basename(output_path)}'
             
             # Auto upload if requested
+            print(f"🔍 DEBUG: auto_upload = {auto_upload}")
             if auto_upload:
-                upload_to_youtube_background(job_id, output_path)
+                print(f"🚀 Starting auto-upload for job {job_id}")
+                processing_jobs[job_id]['message'] = 'Starting YouTube upload...'
+                processing_jobs[job_id]['progress'] = 85
+                upload_result = upload_processed_video_to_youtube(job_id, output_path)
+                print(f"📊 Upload result: {upload_result}")
+                if upload_result['status'] == 'success':
+                    processing_jobs[job_id]['result']['youtube_info'] = upload_result
+                    processing_jobs[job_id]['message'] = 'Processing and upload completed successfully'
+                    print(f"✅ Auto-upload successful for job {job_id}")
+                else:
+                    processing_jobs[job_id]['message'] = f"Processing completed, but upload failed: {upload_result.get('message', 'Unknown error')}"
+                    print(f"❌ Auto-upload failed for job {job_id}: {upload_result.get('message')}")
+            else:
+                print(f"⏭️ Auto-upload skipped for job {job_id} (auto_upload = {auto_upload})")
         else:
             processing_jobs[job_id]['status'] = JobStatus.FAILED
             processing_jobs[job_id]['message'] = f"Processing failed: {result.get('error_message', 'Unknown error')}"
@@ -195,9 +236,50 @@ def process_video_background(job_id, input_path, output_path, background_style, 
         if os.path.exists(input_path):
             os.remove(input_path)
             
+        # Clean up custom intro/outro files
+        if custom_intro_path and os.path.exists(custom_intro_path):
+            os.remove(custom_intro_path)
+        if custom_outro_path and os.path.exists(custom_outro_path):
+            os.remove(custom_outro_path)
+            
     except Exception as e:
         processing_jobs[job_id]['status'] = JobStatus.FAILED
         processing_jobs[job_id]['message'] = f"Processing error: {str(e)}"
+
+
+def upload_processed_video_to_youtube(job_id, video_path):
+    """Upload processed video to YouTube (synchronous for auto-upload)"""
+    try:
+        # Generate title from filename
+        title = Path(video_path).stem.replace('processed_', '').replace('_', ' ').title()
+        if len(title) > 97:
+            title = title[:94] + '...'
+        
+        description = f"Cam on ban da theo doi KENH\n\nProcessed on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n#Shorts #Video #YouTube"
+        tags = ['Shorts', 'Video', 'Upload', 'Processed']
+        
+        # Create uploader
+        uploader = YouTubeUploader(
+            client_secrets_file=YOUTUBE_CONFIG['client_secrets_file'],
+            credentials_file=YOUTUBE_CONFIG['credentials_file']
+        )
+        
+        # Upload video
+        result = uploader.upload_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tags,
+            privacy_status='public'
+        )
+        
+        return result
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f'Upload error: {str(e)}'
+        }
 
 
 # ================================

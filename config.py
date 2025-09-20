@@ -36,7 +36,7 @@ VIDEO_CONFIG = {
     'audio_codec': 'aac',
     'background_style': os.getenv('BACKGROUND_STYLE', 'blur'),  # blur, gradient, solid
     'banner_intro_path': os.getenv('DEFAULT_INTRO_PATH', 'assets/intro.png'),
-    'banner_outro_path': os.getenv('DEFAULT_OUTTRO_PATH', 'assets/outtro.png'),
+    'banner_outro_path': os.getenv('DEFAULT_OUTRO_PATH', 'assets/outro.png'),
 }
 
 # Supported video formats
